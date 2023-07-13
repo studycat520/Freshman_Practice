@@ -9,7 +9,8 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 #train
 # 定义网络结构
@@ -78,9 +79,21 @@ if __name__ == '__main__':
     # 定义优化器
     optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
 
+    #训练Epoch
+    epochs = 10
+    train_loss_dict = []
+    train_acc_dict = []
+
     # train
-    for epoch in range(40):  # 训练epoch自定
-        running_loss = 0.0  # 损失函数记录值
+    print("-----------------开始训练-----------------")
+    for epoch in range(epochs):  # 训练epoch自定
+        sizea = len(train_loader.dataset)
+        sizel = len(train_loader)
+
+        train_loss, train_acc = 0.0, 0.0
+        correct0 = 0  # 预测正确的数量
+        total0 = 0  # 训练集的总数
+
         for i, data in enumerate(train_loader, 0):
             # 获取模型输入；data是由[inputs, labels]组成的列表
             inputs, labels = data
@@ -95,13 +108,40 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
 
-            # 打印统计数据
-            running_loss += loss.item()
-            if i % 1000 == 999:  # 1000个mini-batch打印一次统计信息
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
-                running_loss = 0.0  #损失函数记录清零
+            #计算loss和acc
+            #train_acc += (outputs.argmax(1) == labels).type(torch.float).sum().item()
+            train_loss += loss.item()
+            # 选择置信度最高的类别作为预测类别
+            _, predicted = torch.max(outputs.data, 1)
+            total0 += labels.size(0)
+            correct0 += (predicted == labels).sum().item()
 
-    print("训练结束")
+        train_acc = correct0/total0
+        train_loss /= sizel
+        train_acc_dict.append(train_acc)
+        train_loss_dict.append(train_loss)
+
+        print('Epoch:{:2d},Train_acc:{:.1f}%,Train_loss:{:.3f}'.format(epoch + 1, train_acc * 100, train_loss))
+
+
+    print("-----------------训练结束-----------------")
+
+    #画训练曲线
+    epochs_range = range(epochs)
+
+    plt.figure(figsize=(12, 3))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs_range, train_acc_dict, label="Training Accuracy")
+    plt.legend(loc='lower right')
+    plt.title('Train Accuracy')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs_range, train_loss_dict, label="Training Loss")
+    plt.legend(loc='upper right')
+    plt.title('Train Loss')
+
+    plt.show()
 
     # save
     # 保存模型参数
